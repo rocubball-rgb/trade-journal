@@ -55,6 +55,7 @@ export default function EditPosition() {
           ncfd_reading: formData.ncfd_reading,
           market_cycle: formData.market_cycle,
           notes: formData.notes,
+          chart_url: formData.chart_url,
           current_price: formData.current_price,
         })
         .eq('id', positionId)
@@ -238,6 +239,18 @@ export default function EditPosition() {
             <span>50</span>
             <span>100</span>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">TradingView Chart URL (optional)</label>
+          <input
+            type="url"
+            name="chart_url"
+            value={formData.chart_url || ''}
+            onChange={handleChange}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://www.tradingview.com/chart/..."
+          />
         </div>
 
         <div>

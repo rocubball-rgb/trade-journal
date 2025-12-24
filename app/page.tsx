@@ -5,6 +5,9 @@ import SetupBadge from '@/components/SetupBadge'
 import { formatCurrency, formatPercent, getColorClass, calculatePositionMetrics } from '@/lib/calculations'
 import { Position, Exit, SetupType, Account, PositionWithExits } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function getDashboardData() {
   const currentYear = new Date().getFullYear()
 
@@ -15,35 +18,27 @@ async function getDashboardData() {
     .eq('year', currentYear)
     .single()
 
-  // Get ALL positions with their exits using Supabase relation query
-  const { data: positionsData, error: posError } = await supabase
+  // Get all positions
+  const { data: positionsData } = await supabase
     .from('positions')
-    .select(`
-      *,
-      exits (*)
-    `)
+    .select('*')
     .order('entry_date', { ascending: false })
 
-  if (posError) {
-    console.error('[Dashboard] Error fetching positions:', posError)
-  }
+  // Get all exits
+  const { data: exitsData } = await supabase
+    .from('exits')
+    .select('*')
 
   // Get setup types
   const { data: setupTypes } = await supabase
     .from('setup_types')
     .select('*')
 
-  // Transform the data to match PositionWithExits type
-  const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position: any) => ({
+  // Combine positions with their exits
+  const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position) => ({
     ...position,
-    exits: position.exits || [],
+    exits: (exitsData || []).filter((exit) => exit.position_id === position.id),
   }))
-
-  console.log('[Dashboard] Total positions fetched:', positionsData?.length || 0)
-  console.log('[Dashboard] Sample position with exits:', positionsWithExits?.[0])
-  console.log('[Dashboard] Position ID:', positionsWithExits?.[0]?.id)
-  console.log('[Dashboard] Exits for this position:', positionsWithExits?.[0]?.exits)
-  console.log('[Dashboard] Number of exits for first position:', positionsWithExits?.[0]?.exits?.length || 0)
 
   return { account, positions: positionsWithExits, setupTypes: setupTypes || [] }
 }
@@ -75,6 +70,37 @@ function calculateYTDMetrics(positions: PositionWithExits[], startingCapital: nu
   const avgR = positions.length > 0 ? totalR / positions.length : 0
   const ytdReturn = startingCapital > 0 ? (totalNetPnL / startingCapital) * 100 : 0
 
+  // Calculate win streak
+  const closedPositions = positions
+    .filter((p) => {
+      const metrics = calculatePositionMetrics(p, p.exits)
+      return !metrics.is_open && metrics.last_exit_date
+    })
+    .sort((a, b) => {
+      const aMetrics = calculatePositionMetrics(a, a.exits)
+      const bMetrics = calculatePositionMetrics(b, b.exits)
+      return (bMetrics.last_exit_date || '').localeCompare(aMetrics.last_exit_date || '')
+    })
+
+  let winStreak = 0
+  let isWinStreak = true
+
+  if (closedPositions.length > 0) {
+    const firstMetrics = calculatePositionMetrics(closedPositions[0], closedPositions[0].exits)
+    isWinStreak = firstMetrics.total_pnl > 0
+
+    for (const position of closedPositions) {
+      const metrics = calculatePositionMetrics(position, position.exits)
+      const isWin = metrics.total_pnl > 0
+
+      if (isWin === isWinStreak) {
+        winStreak++
+      } else {
+        break
+      }
+    }
+  }
+
   return {
     totalNetPnL,
     totalFees,
@@ -85,6 +111,8 @@ function calculateYTDMetrics(positions: PositionWithExits[], startingCapital: nu
     ytdReturn,
     numPositions: positions.length,
     numClosedPositions,
+    winStreak,
+    isWinStreak,
   }
 }
 
@@ -167,6 +195,21 @@ export default async function Dashboard() {
     return setup?.color || '#6b7280'
   }
 
+  // Calculate Portfolio Heat (total risk exposure for open positions)
+  const portfolioHeat = openPositions.reduce((total, position) => {
+    const m = calculatePositionMetrics(position, position.exits)
+    const riskPerShare = Math.abs(position.entry_price - position.stop_price)
+    return total + riskPerShare * m.shares_remaining
+  }, 0)
+
+  const portfolioHeatPercent = startingCapital > 0 ? (portfolioHeat / startingCapital) * 100 : 0
+
+  const getPortfolioHeatColor = () => {
+    if (portfolioHeatPercent < 3) return 'text-green-500'
+    if (portfolioHeatPercent <= 6) return 'text-yellow-500'
+    return 'text-red-500'
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -203,6 +246,12 @@ export default async function Dashboard() {
             valueColor={getColorClass(metrics.totalUnrealizedPnL)}
           />
           <StatCard
+            label="Portfolio Heat"
+            value={formatCurrency(portfolioHeat)}
+            valueColor={getPortfolioHeatColor()}
+            subValue={`${portfolioHeatPercent.toFixed(2)}% at risk`}
+          />
+          <StatCard
             label="Total Fees"
             value={`$${metrics.totalFees.toFixed(2)}`}
             valueColor="text-gray-400"
@@ -223,6 +272,12 @@ export default async function Dashboard() {
             label="Average R"
             value={`${metrics.avgR.toFixed(2)}R`}
             valueColor={getColorClass(metrics.avgR)}
+          />
+          <StatCard
+            label="Win Streak"
+            value={metrics.winStreak > 0 ? `${metrics.winStreak}${metrics.isWinStreak ? 'W' : 'L'}` : '-'}
+            valueColor={metrics.winStreak > 0 ? (metrics.isWinStreak ? 'text-green-500' : 'text-red-500') : 'text-gray-400'}
+            subValue={metrics.winStreak > 0 ? (metrics.isWinStreak ? 'win streak' : 'loss streak') : 'no streak'}
           />
         </div>
       </div>

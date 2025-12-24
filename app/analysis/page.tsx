@@ -3,30 +3,29 @@ import { PositionWithExits, SetupType } from '@/lib/types'
 import SetupBadge from '@/components/SetupBadge'
 import { formatCurrency, formatRMultiple, getColorClass, calculatePositionMetrics } from '@/lib/calculations'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 async function getAnalysisData() {
-  // Get ALL positions with their exits using Supabase relation query
-  const { data: positionsData, error: posError } = await supabase
+  // Get all positions
+  const { data: positionsData } = await supabase
     .from('positions')
-    .select(`
-      *,
-      exits (*)
-    `)
+    .select('*')
     .order('entry_date', { ascending: false })
 
-  if (posError) {
-    console.error('[Analysis] Error fetching positions:', posError)
-  }
+  // Get all exits
+  const { data: exitsData } = await supabase
+    .from('exits')
+    .select('*')
 
+  // Get setup types
   const { data: setupTypes } = await supabase.from('setup_types').select('*')
 
-  // Transform the data to match PositionWithExits type
-  const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position: any) => ({
+  // Combine positions with their exits
+  const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position) => ({
     ...position,
-    exits: position.exits || [],
+    exits: (exitsData || []).filter((exit) => exit.position_id === position.id),
   }))
-
-  console.log('[Analysis] Total positions fetched:', positionsData?.length || 0)
-  console.log('[Analysis] Sample position exits count:', positionsWithExits?.[0]?.exits?.length || 0)
 
   return { positions: positionsWithExits, setupTypes: setupTypes || [] }
 }
@@ -88,8 +87,11 @@ function analyzeSetups(positions: PositionWithExits[], setupTypes: SetupType[]):
       const avgR = setupPositions.length > 0 ? totalR / setupPositions.length : 0
       const avgDaysHeld = setupPositions.length > 0 ? totalDaysHeld / setupPositions.length : 0
 
-      const largestWinner = closedPnLs.length > 0 ? Math.max(...closedPnLs) : 0
-      const largestLoser = closedPnLs.length > 0 ? Math.min(...closedPnLs) : 0
+      const winningTrades = closedPnLs.filter(pnl => pnl > 0)
+      const losingTrades = closedPnLs.filter(pnl => pnl < 0)
+
+      const largestWinner = winningTrades.length > 0 ? Math.max(...winningTrades) : 0
+      const largestLoser = losingTrades.length > 0 ? Math.min(...losingTrades) : 0
 
       return {
         name,

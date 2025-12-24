@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS positions (
   ncfd_reading INTEGER NOT NULL CHECK (ncfd_reading >= 0 AND ncfd_reading <= 100),
   market_cycle TEXT NOT NULL CHECK (market_cycle IN ('green', 'red')),
   notes TEXT,
+  chart_url TEXT,
   current_price DECIMAL(12, 4),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

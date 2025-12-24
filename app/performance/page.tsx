@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PositionWithExits } from '@/lib/types'
-import { calculatePositionMetrics } from '@/lib/calculations'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 type ChartMode = 'percent' | 'r-multiple'
+type TimePeriod = 'ytd' | '1y' | 'all'
 
 interface ChartDataPoint {
   date: string
@@ -19,6 +19,7 @@ export default function Performance() {
   const [positions, setPositions] = useState<PositionWithExits[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [mode, setMode] = useState<ChartMode>('percent')
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('ytd')
   const [startingCapital, setStartingCapital] = useState<number>(0)
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function Performance() {
     if (positions.length > 0) {
       generateChartData()
     }
-  }, [positions, startingCapital])
+  }, [positions, startingCapital, timePeriod])
 
   async function loadData() {
     const currentYear = new Date().getFullYear()
@@ -64,14 +65,28 @@ export default function Performance() {
   }
 
   function generateChartData() {
+    // Determine date filter based on time period
+    const now = new Date()
+    let startDate: Date | null = null
+
+    if (timePeriod === 'ytd') {
+      startDate = new Date(now.getFullYear(), 0, 1) // Jan 1 of current year
+    } else if (timePeriod === '1y') {
+      startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()) // 12 months ago
+    }
+    // 'all' means no start date filter
+
     // Create a timeline of all exit events
     const events: { date: string; pnl: number; r: number }[] = []
 
     positions.forEach((position) => {
-      const metrics = calculatePositionMetrics(position, position.exits)
-
       // Add each exit as an event
       position.exits.forEach((exit) => {
+        // Filter by time period
+        if (startDate) {
+          const exitDate = new Date(exit.exit_date)
+          if (exitDate < startDate) return
+        }
         const proportionalFee = (exit.shares_sold / position.total_shares) * position.entry_fee
         let exitPnL: number
 
@@ -138,30 +153,67 @@ export default function Performance() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold">Performance Chart</h2>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode('percent')}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              mode === 'percent'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            % Return
-          </button>
-          <button
-            onClick={() => setMode('r-multiple')}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              mode === 'r-multiple'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            R Multiple
-          </button>
+        <div className="flex flex-wrap gap-2">
+          {/* Time Period Toggles */}
+          <div className="flex gap-1 bg-gray-900 p-1 rounded-lg">
+            <button
+              onClick={() => setTimePeriod('ytd')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                timePeriod === 'ytd'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              YTD
+            </button>
+            <button
+              onClick={() => setTimePeriod('1y')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                timePeriod === '1y'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              1Y
+            </button>
+            <button
+              onClick={() => setTimePeriod('all')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                timePeriod === 'all'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              All Time
+            </button>
+          </div>
+
+          {/* Value Type Toggles */}
+          <div className="flex gap-1 bg-gray-900 p-1 rounded-lg">
+            <button
+              onClick={() => setMode('percent')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                mode === 'percent'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              % Return
+            </button>
+            <button
+              onClick={() => setMode('r-multiple')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                mode === 'r-multiple'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              R Multiple
+            </button>
+          </div>
         </div>
       </div>
 

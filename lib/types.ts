@@ -14,6 +14,7 @@ export interface Position {
   ncfd_reading: number
   market_cycle: MarketCycle
   notes: string | null
+  chart_url: string | null
   current_price: number | null
   created_at: string
 }
@@ -59,6 +60,7 @@ export interface PositionInput {
   ncfd_reading: number
   market_cycle: MarketCycle
   notes?: string | null
+  chart_url?: string | null
   current_price?: number | null
 }
 

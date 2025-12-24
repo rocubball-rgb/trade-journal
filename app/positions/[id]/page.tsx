@@ -138,6 +138,23 @@ export default function PositionDetail() {
 
   const metrics = calculatePositionMetrics(position, exits)
 
+  // Convert TradingView snapshot URL to image URL
+  function getTradingViewImageUrl(url: string): string | null {
+    try {
+      const match = url.match(/tradingview\.com\/x\/([A-Za-z0-9]+)/)
+      if (match && match[1]) {
+        const id = match[1]
+        const firstLetter = id[0].toLowerCase()
+        return `https://s3.tradingview.com/snapshots/${firstLetter}/${id}.png`
+      }
+    } catch (e) {
+      console.error('Error parsing TradingView URL:', e)
+    }
+    return null
+  }
+
+  const tradingViewImageUrl = position.chart_url ? getTradingViewImageUrl(position.chart_url) : null
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -188,7 +205,7 @@ export default function PositionDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div>
             <div className="text-gray-400">Entry Price</div>
             <div className="font-semibold">${position.entry_price.toFixed(2)}</div>
@@ -196,6 +213,12 @@ export default function PositionDetail() {
           <div>
             <div className="text-gray-400">Stop Price</div>
             <div className="font-semibold">${position.stop_price.toFixed(2)}</div>
+          </div>
+          <div>
+            <div className="text-gray-400">Stop %</div>
+            <div className="font-semibold">
+              {((Math.abs(position.entry_price - position.stop_price) / position.entry_price) * 100).toFixed(2)}%
+            </div>
           </div>
           <div>
             <div className="text-gray-400">Total Shares</div>
@@ -389,6 +412,39 @@ export default function PositionDetail() {
           </div>
         )}
       </div>
+
+      {/* Chart */}
+      {position.chart_url && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <h3 className="font-semibold mb-3">TradingView Chart</h3>
+          {tradingViewImageUrl ? (
+            <a
+              href={position.chart_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block hover:opacity-90 transition-opacity"
+            >
+              <img
+                src={tradingViewImageUrl}
+                alt="TradingView Chart"
+                className="w-full rounded-lg border border-gray-700"
+              />
+              <div className="text-xs text-gray-400 mt-2 text-center">
+                Click to open in TradingView
+              </div>
+            </a>
+          ) : (
+            <a
+              href={position.chart_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-400 underline break-all"
+            >
+              {position.chart_url}
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Notes */}
       {position.notes && (
