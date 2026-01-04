@@ -6,7 +6,7 @@ import { PositionWithExits } from '@/lib/types'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 type ChartMode = 'percent' | 'r-multiple'
-type TimePeriod = 'ytd' | '1y' | 'all'
+type TimePeriod = 'mtd' | 'qtd' | 'ytd' | '1y' | 'all'
 
 interface ChartDataPoint {
   date: string
@@ -69,7 +69,13 @@ export default function Performance() {
     const now = new Date()
     let startDate: Date | null = null
 
-    if (timePeriod === 'ytd') {
+    if (timePeriod === 'mtd') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1) // 1st of current month
+    } else if (timePeriod === 'qtd') {
+      // Quarter starts: Jan 1 (Q1), Apr 1 (Q2), Jul 1 (Q3), Oct 1 (Q4)
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+      startDate = new Date(now.getFullYear(), quarterStartMonth, 1)
+    } else if (timePeriod === 'ytd') {
       startDate = new Date(now.getFullYear(), 0, 1) // Jan 1 of current year
     } else if (timePeriod === '1y') {
       startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()) // 12 months ago
@@ -148,8 +154,10 @@ export default function Performance() {
   }, [mode])
 
   const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0
-  const valueColor = currentValue >= 0 ? 'text-green-500' : 'text-red-500'
-  const lineColor = currentValue >= 0 ? '#10b981' : '#ef4444'
+  const currentPnL = chartData.length > 0 ? chartData[chartData.length - 1].cumulativePnL : 0
+  const displayValue = mode === 'percent' && startingCapital === 0 ? currentPnL : currentValue
+  const valueColor = displayValue >= 0 ? 'text-green-500' : 'text-red-500'
+  const lineColor = displayValue >= 0 ? '#10b981' : '#ef4444'
 
   return (
     <div className="space-y-6">
@@ -159,6 +167,26 @@ export default function Performance() {
         <div className="flex flex-wrap gap-2">
           {/* Time Period Toggles */}
           <div className="flex gap-1 bg-gray-900 p-1 rounded-lg">
+            <button
+              onClick={() => setTimePeriod('mtd')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                timePeriod === 'mtd'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              MTD
+            </button>
+            <button
+              onClick={() => setTimePeriod('qtd')}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                timePeriod === 'qtd'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              QTD
+            </button>
             <button
               onClick={() => setTimePeriod('ytd')}
               className={`px-3 py-1.5 rounded text-sm transition-colors ${
@@ -220,16 +248,21 @@ export default function Performance() {
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <div className="mb-4">
           <div className="text-sm text-gray-400">
-            {mode === 'percent' ? 'Cumulative Return' : 'Cumulative R Multiple'}
+            {mode === 'percent'
+              ? (startingCapital > 0 ? 'Cumulative Return' : 'Total P&L (Set capital for %)')
+              : 'Cumulative R Multiple'}
           </div>
           <div className={`text-3xl font-bold ${valueColor}`}>
-            {mode === 'percent' ? `${currentValue.toFixed(2)}%` : `${currentValue.toFixed(2)}R`}
+            {mode === 'percent'
+              ? (startingCapital > 0 ? `${currentValue.toFixed(2)}%` : `$${currentPnL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+              : `${currentValue.toFixed(2)}R`}
           </div>
         </div>
 
         {chartData.length === 0 ? (
-          <div className="h-96 flex items-center justify-center text-gray-500">
-            No closed positions to display. Exit positions to see performance over time.
+          <div className="h-96 flex flex-col items-center justify-center text-gray-500 gap-2">
+            <div>No closed positions in this time period.</div>
+            <div className="text-sm">Try selecting a different time range, or use "All Time" to see all trades.</div>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
@@ -295,7 +328,10 @@ export default function Performance() {
           <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
             <div className="text-sm text-gray-400">Return %</div>
             <div className={`text-xl font-semibold ${valueColor}`}>
-              {((chartData[chartData.length - 1].cumulativePnL / startingCapital) * 100).toFixed(2)}%
+              {startingCapital > 0
+                ? `${((chartData[chartData.length - 1].cumulativePnL / startingCapital) * 100).toFixed(2)}%`
+                : <span className="text-gray-500">Set capital in Settings</span>
+              }
             </div>
           </div>
 

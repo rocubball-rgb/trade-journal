@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 export default function Calculator() {
   const [entryPrice, setEntryPrice] = useState<number>(0)
   const [stopPrice, setStopPrice] = useState<number>(0)
-  const [riskPercent, setRiskPercent] = useState<number>(1)
+  const [riskPercent, setRiskPercent] = useState<number>(0.3)
   const [totalCapital, setTotalCapital] = useState<number>(0)
 
   useEffect(() => {
@@ -72,8 +72,8 @@ export default function Calculator() {
               onChange={(e) => setRiskPercent(parseFloat(e.target.value))}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="0.3">0.3%</option>
               <option value="0.25">0.25%</option>
+              <option value="0.3">0.3%</option>
               <option value="0.5">0.5%</option>
               <option value="0.75">0.75%</option>
               <option value="1">1%</option>
