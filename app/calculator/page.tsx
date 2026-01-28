@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 
 export default function Calculator() {
   const [entryPrice, setEntryPrice] = useState<number>(0)
   const [stopPrice, setStopPrice] = useState<number>(0)
   const [riskPercent, setRiskPercent] = useState<number>(0.3)
   const [totalCapital, setTotalCapital] = useState<number>(0)
+  const [capitalLoaded, setCapitalLoaded] = useState<boolean>(false)
+  const [manualCapital, setManualCapital] = useState<boolean>(false)
 
   useEffect(() => {
     loadCapital()
@@ -21,9 +24,10 @@ export default function Calculator() {
       .eq('year', currentYear)
       .single()
 
-    if (account) {
+    if (account && account.starting_capital > 0) {
       setTotalCapital(account.starting_capital)
     }
+    setCapitalLoaded(true)
   }
 
   // Calculate values
@@ -40,7 +44,43 @@ export default function Calculator() {
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold mb-4">Input Parameters</h3>
 
+        {capitalLoaded && totalCapital === 0 && !manualCapital && (
+          <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg">
+            <p className="text-yellow-300 text-sm mb-2">
+              No starting capital set for {new Date().getFullYear()}.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setManualCapital(true)}
+                className="text-sm bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded transition-colors"
+              >
+                Enter Capital Manually
+              </button>
+              <Link
+                href="/settings"
+                className="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded transition-colors"
+              >
+                Go to Settings
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
+          {manualCapital && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Total Capital</label>
+              <input
+                type="number"
+                step="0.01"
+                value={totalCapital || ''}
+                onChange={(e) => setTotalCapital(parseFloat(e.target.value) || 0)}
+                className="w-full bg-gray-900 border border-yellow-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                placeholder="Enter your trading capital"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-2">Entry Price</label>
             <input
