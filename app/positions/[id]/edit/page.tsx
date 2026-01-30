@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getSetupTypes } from '@/lib/setupTypes'
 import { Position, SetupType } from '@/lib/types'
 
 export default function EditPosition() {
@@ -25,13 +26,10 @@ export default function EditPosition() {
       .eq('id', positionId)
       .single()
 
-    const { data: setupTypesData } = await supabase
-      .from('setup_types')
-      .select('*')
-      .order('name')
+    const setupTypesData = await getSetupTypes()
 
     if (position) setFormData(position)
-    if (setupTypesData) setSetupTypes(setupTypesData)
+    setSetupTypes(setupTypesData)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

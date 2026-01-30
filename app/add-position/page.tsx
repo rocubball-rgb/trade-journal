@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getSetupTypes } from '@/lib/setupTypes'
 import { PositionInput, SetupType } from '@/lib/types'
 
 export default function AddPosition() {
@@ -30,12 +31,10 @@ export default function AddPosition() {
   }, [])
 
   async function loadSetupTypes() {
-    const { data } = await supabase.from('setup_types').select('*').order('name')
-    if (data) {
-      setSetupTypes(data)
-      if (data.length > 0) {
-        setFormData((prev) => ({ ...prev, setup_type: data[0].name }))
-      }
+    const data = await getSetupTypes()
+    setSetupTypes(data)
+    if (data.length > 0) {
+      setFormData((prev) => ({ ...prev, setup_type: data[0].name }))
     }
   }
 

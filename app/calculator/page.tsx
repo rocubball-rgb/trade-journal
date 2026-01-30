@@ -36,6 +36,7 @@ export default function Calculator() {
   const sharesToBuy = riskPerShare > 0 ? Math.floor(riskAmount / riskPerShare) : 0
   const totalPositionSize = sharesToBuy * entryPrice
   const positionPercent = totalCapital > 0 ? (totalPositionSize / totalCapital) * 100 : 0
+  const stopPercent = entryPrice > 0 ? (riskPerShare / entryPrice) * 100 : 0
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -141,6 +142,11 @@ export default function Calculator() {
           <div className="flex justify-between items-center py-2 border-b border-gray-700">
             <span className="text-gray-400">Risk Per Share</span>
             <span className="text-xl font-semibold">${riskPerShare.toFixed(2)}</span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-gray-700">
+            <span className="text-gray-400">Stop %</span>
+            <span className="text-xl font-semibold">{stopPercent.toFixed(2)}%</span>
           </div>
 
           <div className="flex justify-between items-center py-2 border-b border-gray-700">

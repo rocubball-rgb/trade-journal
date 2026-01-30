@@ -61,6 +61,7 @@ INSERT INTO setup_types (name, color) VALUES
   ('VCP', '#8b5cf6'),
   ('Breakout', '#10b981'),
   ('Earnings', '#f59e0b'),
+  ('META Pullback', '#ec4899'),
   ('Other', '#6b7280')
 ON CONFLICT (name) DO NOTHING;
 
