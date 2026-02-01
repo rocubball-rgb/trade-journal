@@ -70,6 +70,17 @@ INSERT INTO accounts (year, starting_capital) VALUES
   (EXTRACT(YEAR FROM NOW())::INTEGER, 100000.00)
 ON CONFLICT (year) DO NOTHING;
 
+-- Journal entries table (market commentary)
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  entry_date DATE NOT NULL,
+  content TEXT NOT NULL,
+  chart_urls TEXT[] DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_journal_entry_date ON journal_entries(entry_date DESC);
+
 -- Enable Row Level Security (optional - for future auth)
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE positions ENABLE ROW LEVEL SECURITY;
@@ -81,3 +92,6 @@ CREATE POLICY "Allow all operations on accounts" ON accounts FOR ALL USING (true
 CREATE POLICY "Allow all operations on positions" ON positions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all operations on exits" ON exits FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all operations on setup_types" ON setup_types FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on journal_entries" ON journal_entries FOR ALL USING (true) WITH CHECK (true);

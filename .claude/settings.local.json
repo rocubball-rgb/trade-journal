@@ -6,7 +6,8 @@
       "Bash(npm --version:*)",
       "Bash(cat:*)",
       "Bash(npm run dev:*)",
-      "Bash(node scripts/diagnose.js:*)"
+      "Bash(node scripts/diagnose.js:*)",
+      "Read(//Users/rockyullah/Downloads/Apps/**)"
     ]
   }
 }

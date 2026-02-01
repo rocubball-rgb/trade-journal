@@ -15,7 +15,7 @@ export default function PositionsList() {
   const [filters, setFilters] = useState({
     setup_type: 'all',
     market_cycle: 'all',
-    status: 'all', // all/open/closed
+    status: 'open', // all/open/closed
     result: 'all', // all/win/loss
   })
 

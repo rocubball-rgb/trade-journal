@@ -295,12 +295,39 @@ export default function PositionDetail() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">Exits ({exits.length})</h2>
           {metrics.is_open && (
-            <button
-              onClick={() => setShowAddExit(!showAddExit)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
-            >
-              {showAddExit ? 'Cancel' : 'Sell Shares'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (showAddExit) {
+                    setShowAddExit(false)
+                    setExitForm({ exit_date: '', exit_price: 0, shares_sold: 0, exit_fee: 0, notes: '' })
+                  } else {
+                    setShowAddExit(true)
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                {showAddExit ? 'Cancel' : 'Sell Shares'}
+              </button>
+              {!showAddExit && (
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0]
+                    setExitForm({
+                      exit_date: today,
+                      exit_price: position.stop_price,
+                      shares_sold: metrics.shares_remaining,
+                      exit_fee: 0,
+                      notes: 'Stopped out',
+                    })
+                    setShowAddExit(true)
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
+                >
+                  Stopped Out
+                </button>
+              )}
+            </div>
           )}
         </div>
 
