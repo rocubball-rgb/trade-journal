@@ -6,9 +6,19 @@ import { supabase } from '@/lib/supabase'
 import { getSetupTypes } from '@/lib/setupTypes'
 import { PositionInput, SetupType } from '@/lib/types'
 
+interface SavedCalculation {
+  id: string
+  ticker: string
+  entry_price: number
+  stop_price: number
+  risk_percent: number
+  shares_to_buy: number
+}
+
 export default function AddPosition() {
   const router = useRouter()
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([])
+  const [savedCalcs, setSavedCalcs] = useState<SavedCalculation[]>([])
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<PositionInput>({
     ticker: '',
@@ -28,6 +38,7 @@ export default function AddPosition() {
 
   useEffect(() => {
     loadSetupTypes()
+    loadSavedCalcs()
   }, [])
 
   async function loadSetupTypes() {
@@ -36,6 +47,25 @@ export default function AddPosition() {
     if (data.length > 0) {
       setFormData((prev) => ({ ...prev, setup_type: data[0].name }))
     }
+  }
+
+  async function loadSavedCalcs() {
+    const { data } = await supabase
+      .from('saved_calculations')
+      .select('*')
+      .order('ticker', { ascending: true })
+
+    if (data) setSavedCalcs(data)
+  }
+
+  function applyWatchlistItem(calc: SavedCalculation) {
+    setFormData((prev) => ({
+      ...prev,
+      ticker: calc.ticker,
+      entry_price: calc.entry_price,
+      stop_price: calc.stop_price,
+      total_shares: calc.shares_to_buy,
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,6 +99,24 @@ export default function AddPosition() {
   return (
     <div className="max-w-2xl mx-auto">
       <h2 className="text-2xl font-bold mb-6">Add Position</h2>
+
+      {savedCalcs.length > 0 && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-3">Quick Fill from Watchlist</h3>
+          <div className="flex flex-wrap gap-2">
+            {savedCalcs.map((calc) => (
+              <button
+                key={calc.id}
+                type="button"
+                onClick={() => applyWatchlistItem(calc)}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm transition-colors"
+              >
+                {calc.ticker} <span className="text-gray-400">@ ${calc.entry_price.toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

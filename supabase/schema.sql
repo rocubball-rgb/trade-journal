@@ -81,6 +81,18 @@ CREATE TABLE IF NOT EXISTS journal_entries (
 
 CREATE INDEX IF NOT EXISTS idx_journal_entry_date ON journal_entries(entry_date DESC);
 
+-- Saved calculations table (calculator watchlist)
+CREATE TABLE IF NOT EXISTS saved_calculations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  ticker TEXT NOT NULL,
+  entry_price DECIMAL(12, 4) NOT NULL,
+  stop_price DECIMAL(12, 4) NOT NULL,
+  risk_percent DECIMAL(5, 2) NOT NULL,
+  shares_to_buy INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable Row Level Security (optional - for future auth)
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE positions ENABLE ROW LEVEL SECURITY;
@@ -95,3 +107,6 @@ CREATE POLICY "Allow all operations on setup_types" ON setup_types FOR ALL USING
 
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on journal_entries" ON journal_entries FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE saved_calculations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on saved_calculations" ON saved_calculations FOR ALL USING (true) WITH CHECK (true);
