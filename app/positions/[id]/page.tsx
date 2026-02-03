@@ -290,6 +290,107 @@ export default function PositionDetail() {
         </div>
       )}
 
+      {/* Split Stops */}
+      {metrics.is_open && metrics.shares_remaining > 0 && (() => {
+        const remaining = metrics.shares_remaining
+        const third = Math.floor(remaining / 3)
+        const lastThird = remaining - third * 2
+        const riskPerShare = position.direction === 'long'
+          ? position.entry_price - position.stop_price
+          : position.stop_price - position.entry_price
+        const oneThirdPrice = position.direction === 'long'
+          ? position.entry_price - (riskPerShare / 3)
+          : position.entry_price + (riskPerShare / 3)
+        const twoThirdPrice = position.direction === 'long'
+          ? position.entry_price - (riskPerShare * 2 / 3)
+          : position.entry_price + (riskPerShare * 2 / 3)
+
+        const tiers = [
+          { label: '1/3 Stop', price: oneThirdPrice, shares: third },
+          { label: '2/3 Stop', price: twoThirdPrice, shares: third },
+          { label: 'Full Stop', price: position.stop_price, shares: lastThird },
+        ]
+
+        return (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <h3 className="font-semibold mb-4">Split Stops</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-gray-400 border-b border-gray-700">
+                    <th className="text-left py-2 pr-3">Level</th>
+                    <th className="text-right py-2 px-3">Price</th>
+                    <th className="text-right py-2 px-3">Shares</th>
+                    <th className="text-right py-2 pl-3">Est. Loss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tiers.map((tier) => {
+                    const pnl = position.direction === 'long'
+                      ? (tier.price - position.entry_price) * tier.shares
+                      : (position.entry_price - tier.price) * tier.shares
+                    return (
+                      <tr key={tier.label} className="border-b border-gray-700/50">
+                        <td className="py-2 pr-3 font-medium">{tier.label}</td>
+                        <td className="text-right py-2 px-3">${tier.price.toFixed(2)}</td>
+                        <td className="text-right py-2 px-3">{tier.shares} shares</td>
+                        <td className={`text-right py-2 pl-3 font-semibold ${getColorClass(pnl)}`}>
+                          {formatCurrency(pnl)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-xs text-gray-500 mt-3">
+              Total if all stops hit: {formatCurrency(
+                tiers.reduce((sum, tier) => {
+                  const pnl = position.direction === 'long'
+                    ? (tier.price - position.entry_price) * tier.shares
+                    : (position.entry_price - tier.price) * tier.shares
+                  return sum + pnl
+                }, 0)
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Take Profit — 2R */}
+      {metrics.is_open && metrics.shares_remaining > 0 && (() => {
+        const riskPerShare = position.direction === 'long'
+          ? position.entry_price - position.stop_price
+          : position.stop_price - position.entry_price
+        const twoRPrice = position.direction === 'long'
+          ? position.entry_price + 2 * riskPerShare
+          : position.entry_price - 2 * riskPerShare
+        const sharesToSell = Math.round(metrics.shares_remaining * 0.33)
+        const profit = position.direction === 'long'
+          ? (twoRPrice - position.entry_price) * sharesToSell
+          : (position.entry_price - twoRPrice) * sharesToSell
+
+        return (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <h3 className="font-semibold mb-4">Take Profit — 2R</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                <span className="text-gray-400">2R Target Price</span>
+                <span className="text-xl font-semibold">${twoRPrice.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                <span className="text-gray-400">Shares to Sell (1/3)</span>
+                <span className="text-xl font-semibold text-blue-400">{sharesToSell}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-400">Estimated Profit</span>
+                <span className="text-xl font-semibold text-green-500">{formatCurrency(profit)}</span>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Exits List */}
       <div>
         <div className="flex items-center justify-between mb-4">
