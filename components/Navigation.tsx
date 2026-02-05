@@ -19,21 +19,21 @@ export default function Navigation() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 md:static md:border-t-0 md:border-b md:mb-6 z-50">
-      <div className="flex justify-around md:justify-center md:gap-4 max-w-7xl mx-auto">
+      <div className="flex overflow-x-auto md:overflow-visible md:justify-center md:gap-4 max-w-7xl mx-auto scrollbar-hide">
         {navItems.map((item) => {
           const isActive = pathname === item.href
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col md:flex-row items-center gap-1 md:gap-2 py-3 px-4 transition-colors ${
+              className={`flex flex-col md:flex-row items-center gap-1 md:gap-2 py-3 px-3 md:px-4 flex-shrink-0 transition-colors ${
                 isActive
                   ? 'text-blue-500'
                   : 'text-gray-400 hover:text-gray-200'
               }`}
             >
               <span className="text-xl md:text-base">{item.icon}</span>
-              <span className="text-xs md:text-sm font-medium">{item.name}</span>
+              <span className="text-xs md:text-sm font-medium whitespace-nowrap">{item.name}</span>
             </Link>
           )
         })}
