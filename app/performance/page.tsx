@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PositionWithExits } from '@/lib/types'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 
 type ChartMode = 'percent' | 'r-multiple'
 type TimePeriod = 'mtd' | 'qtd' | 'ytd' | '1y' | 'all'
@@ -15,12 +15,23 @@ interface ChartDataPoint {
   cumulativeR: number
 }
 
+interface MonthlyData {
+  month: string
+  monthIndex: number
+  trades: number
+  netPnL: number
+  returnPct: number
+}
+
 export default function Performance() {
   const [positions, setPositions] = useState<PositionWithExits[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [mode, setMode] = useState<ChartMode>('percent')
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ytd')
   const [startingCapital, setStartingCapital] = useState<number>(0)
+  const [availableYears, setAvailableYears] = useState<number[]>([])
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([])
 
   useEffect(() => {
     loadData()
@@ -139,6 +150,83 @@ export default function Performance() {
 
     setChartData(data)
   }
+
+  // Generate monthly performance data
+  function generateMonthlyData() {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    // Extract all years from exit dates
+    const years = new Set<number>()
+    positions.forEach((position) => {
+      position.exits.forEach((exit) => {
+        const year = new Date(exit.exit_date).getFullYear()
+        years.add(year)
+      })
+    })
+
+    const sortedYears = Array.from(years).sort((a, b) => b - a) // Descending
+    setAvailableYears(sortedYears)
+
+    // If selected year not in available years, default to current year or first available
+    if (sortedYears.length > 0 && !sortedYears.includes(selectedYear)) {
+      const currentYear = new Date().getFullYear()
+      setSelectedYear(sortedYears.includes(currentYear) ? currentYear : sortedYears[0])
+      return // Will re-run when selectedYear updates
+    }
+
+    // Initialize monthly data for all 12 months
+    const monthly: MonthlyData[] = monthNames.map((month, index) => ({
+      month,
+      monthIndex: index,
+      trades: 0,
+      netPnL: 0,
+      returnPct: 0,
+    }))
+
+    // Calculate P&L for each month in selected year
+    positions.forEach((position) => {
+      position.exits.forEach((exit) => {
+        const exitDate = new Date(exit.exit_date)
+        if (exitDate.getFullYear() !== selectedYear) return
+
+        const monthIndex = exitDate.getMonth()
+        const proportionalFee = (exit.shares_sold / position.total_shares) * position.entry_fee
+        let exitPnL: number
+
+        if (position.direction === 'long') {
+          exitPnL = (exit.exit_price - position.entry_price) * exit.shares_sold
+        } else {
+          exitPnL = (position.entry_price - exit.exit_price) * exit.shares_sold
+        }
+
+        exitPnL = exitPnL - exit.exit_fee - proportionalFee
+
+        monthly[monthIndex].trades += 1
+        monthly[monthIndex].netPnL += exitPnL
+      })
+    })
+
+    // Calculate return percentage for each month
+    monthly.forEach((m) => {
+      m.returnPct = startingCapital > 0 ? (m.netPnL / startingCapital) * 100 : 0
+    })
+
+    setMonthlyData(monthly)
+  }
+
+  useEffect(() => {
+    if (positions.length > 0) {
+      generateMonthlyData()
+    }
+  }, [positions, selectedYear, startingCapital])
+
+  // Calculate compound return for the year
+  const compoundReturn = monthlyData.reduce((acc, month) => {
+    if (month.trades > 0) {
+      return acc * (1 + month.returnPct / 100)
+    }
+    return acc
+  }, 1) - 1
 
   useEffect(() => {
     if (chartData.length > 0) {
@@ -343,6 +431,109 @@ export default function Performance() {
           </div>
         </div>
       )}
+
+      {/* Monthly Performance Breakdown */}
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-2xl font-bold">Monthly Performance Breakdown</h2>
+
+          {/* Year Toggle */}
+          {availableYears.length > 0 && (
+            <div className="flex gap-1 bg-gray-900 p-1 rounded-lg">
+              {availableYears.map((year) => (
+                <button
+                  key={year}
+                  onClick={() => setSelectedYear(year)}
+                  className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                    selectedYear === year
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Compound Return Card */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="text-sm text-gray-400 mb-1">{selectedYear} Compound Return</div>
+          <div className={`text-3xl font-bold ${compoundReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {startingCapital > 0 ? `${(compoundReturn * 100).toFixed(2)}%` : <span className="text-gray-500">Set capital in Settings</span>}
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
+            Calculated by compounding each month&apos;s return
+          </div>
+        </div>
+
+        {/* Monthly Bar Chart */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold mb-4">Monthly Returns</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis
+                dataKey="month"
+                stroke="#9ca3af"
+                tick={{ fill: '#9ca3af' }}
+              />
+              <YAxis
+                stroke="#9ca3af"
+                tick={{ fill: '#9ca3af' }}
+                tickFormatter={(value) => `${value.toFixed(0)}%`}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1f2937',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                }}
+                labelStyle={{ color: '#9ca3af' }}
+                formatter={(value: number) => [`${value.toFixed(2)}%`, 'Return']}
+              />
+              <ReferenceLine y={0} stroke="#6b7280" />
+              <Bar dataKey="returnPct" radius={[4, 4, 0, 0]}>
+                {monthlyData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.returnPct >= 0 ? '#10b981' : '#ef4444'}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Monthly Table */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-900">
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Month</th>
+                <th className="text-right px-4 py-3 text-sm font-medium text-gray-400"># Trades</th>
+                <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">Net P&L ($)</th>
+                <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">Return (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlyData.map((month) => (
+                <tr key={month.month} className="border-t border-gray-700 hover:bg-gray-750">
+                  <td className="px-4 py-3 font-medium">{month.month}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{month.trades}</td>
+                  <td className={`px-4 py-3 text-right ${month.netPnL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    ${month.netPnL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className={`px-4 py-3 text-right ${month.returnPct >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {month.returnPct.toFixed(2)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
