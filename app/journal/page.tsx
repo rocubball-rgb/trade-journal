@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 interface JournalEntry {
   id: string
   entry_date: string
+  headline: string | null
   content: string
   chart_urls: string[]
   created_at: string
@@ -30,11 +31,13 @@ export default function JournalPage() {
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
 
   const [form, setForm] = useState({
     entry_date: today,
+    headline: '',
     content: '',
     chart_urls: [''],
   })
@@ -53,7 +56,7 @@ export default function JournalPage() {
   }
 
   function resetForm() {
-    setForm({ entry_date: today, content: '', chart_urls: [''] })
+    setForm({ entry_date: today, headline: '', content: '', chart_urls: [''] })
     setShowForm(false)
     setEditingId(null)
   }
@@ -70,6 +73,7 @@ export default function JournalPage() {
           .from('journal_entries')
           .update({
             entry_date: form.entry_date,
+            headline: form.headline.trim() || null,
             content: form.content,
             chart_urls: chartUrls,
           })
@@ -80,6 +84,7 @@ export default function JournalPage() {
         const { error } = await supabase.from('journal_entries').insert([
           {
             entry_date: form.entry_date,
+            headline: form.headline.trim() || null,
             content: form.content,
             chart_urls: chartUrls,
           },
@@ -101,6 +106,7 @@ export default function JournalPage() {
   function handleEdit(entry: JournalEntry) {
     setForm({
       entry_date: entry.entry_date,
+      headline: entry.headline || '',
       content: entry.content,
       chart_urls: entry.chart_urls.length > 0 ? [...entry.chart_urls, ''] : [''],
     })
@@ -176,6 +182,17 @@ export default function JournalPage() {
           </div>
 
           <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Headline</label>
+            <input
+              type="text"
+              value={form.headline}
+              onChange={(e) => setForm({ ...form, headline: e.target.value })}
+              placeholder="e.g. Fed holds rates, QQQ breaks out above 50 EMA"
+              className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Commentary</label>
             <textarea
               value={form.content}
@@ -228,16 +245,43 @@ export default function JournalPage() {
         </form>
       )}
 
+      {entries.length > 0 && (
+        <div className="mb-4">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search headlines and entries..."
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
+
       {entries.length === 0 ? (
         <div className="bg-gray-800 rounded-lg p-12 text-center text-gray-500">
           No journal entries yet. Start documenting your market thoughts.
         </div>
       ) : (
         <div className="space-y-4">
-          {entries.map((entry) => (
+          {entries
+            .filter((entry) => {
+              if (!searchQuery.trim()) return true
+              const q = searchQuery.toLowerCase()
+              return (
+                (entry.headline && entry.headline.toLowerCase().includes(q)) ||
+                entry.content.toLowerCase().includes(q) ||
+                entry.entry_date.includes(q)
+              )
+            })
+            .map((entry) => (
             <div key={entry.id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-3">
-                <div className="font-bold text-lg">{entry.entry_date}</div>
+                <div>
+                  {entry.headline && (
+                    <div className="font-bold text-lg">{entry.headline}</div>
+                  )}
+                  <div className={entry.headline ? 'text-sm text-gray-400' : 'font-bold text-lg'}>{entry.entry_date}</div>
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEdit(entry)}

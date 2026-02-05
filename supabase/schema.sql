@@ -74,6 +74,7 @@ ON CONFLICT (year) DO NOTHING;
 CREATE TABLE IF NOT EXISTS journal_entries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   entry_date DATE NOT NULL,
+  headline TEXT,
   content TEXT NOT NULL,
   chart_urls TEXT[] DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
