@@ -70,6 +70,18 @@ INSERT INTO accounts (year, starting_capital) VALUES
   (EXTRACT(YEAR FROM NOW())::INTEGER, 100000.00)
 ON CONFLICT (year) DO NOTHING;
 
+-- Position charts table (additional charts for a position)
+CREATE TABLE IF NOT EXISTS position_charts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  position_id UUID NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+  chart_url TEXT NOT NULL,
+  label TEXT,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_position_charts_position_id ON position_charts(position_id);
+
 -- Journal entries table (market commentary)
 CREATE TABLE IF NOT EXISTS journal_entries (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -111,3 +123,6 @@ CREATE POLICY "Allow all operations on journal_entries" ON journal_entries FOR A
 
 ALTER TABLE saved_calculations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on saved_calculations" ON saved_calculations FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE position_charts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations on position_charts" ON position_charts FOR ALL USING (true) WITH CHECK (true);

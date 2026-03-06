@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Position, Exit, PositionWithExits } from '@/lib/types'
+import { Position, Exit, PositionWithExits, PositionChart } from '@/lib/types'
 import { calculatePositionMetrics, calculateExitPnL, formatCurrency, formatRMultiple, getColorClass } from '@/lib/calculations'
 import SetupBadge from '@/components/SetupBadge'
 
@@ -17,6 +17,9 @@ export default function PositionDetail() {
   const [setupColor, setSetupColor] = useState('#6b7280')
   const [showAddExit, setShowAddExit] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [additionalCharts, setAdditionalCharts] = useState<PositionChart[]>([])
+  const [showAddChart, setShowAddChart] = useState(false)
+  const [chartForm, setChartForm] = useState({ chart_url: '', label: '', notes: '' })
 
   const [exitForm, setExitForm] = useState({
     exit_date: '',
@@ -57,6 +60,15 @@ export default function PositionDetail() {
     }
 
     if (exitsData) setExits(exitsData)
+
+    // Load additional charts
+    const { data: chartsData } = await supabase
+      .from('position_charts')
+      .select('*')
+      .eq('position_id', positionId)
+      .order('created_at', { ascending: true })
+
+    if (chartsData) setAdditionalCharts(chartsData)
   }
 
   const handleAddExit = async (e: React.FormEvent) => {
@@ -129,6 +141,43 @@ export default function PositionDetail() {
     } catch (error) {
       console.error('Error deleting position:', error)
       alert('Failed to delete position. Please try again.')
+    }
+  }
+
+  const handleAddChart = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!chartForm.chart_url.trim()) return
+
+    setLoading(true)
+    try {
+      const { error } = await supabase.from('position_charts').insert([{
+        position_id: positionId,
+        chart_url: chartForm.chart_url.trim(),
+        label: chartForm.label.trim() || null,
+        notes: chartForm.notes.trim() || null,
+      }])
+
+      if (error) throw error
+      await loadPosition()
+      setChartForm({ chart_url: '', label: '', notes: '' })
+      setShowAddChart(false)
+    } catch (error) {
+      console.error('Error adding chart:', error)
+      alert('Failed to add chart. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteChart = async (chartId: string) => {
+    if (!confirm('Delete this chart?')) return
+
+    try {
+      const { error } = await supabase.from('position_charts').delete().eq('id', chartId)
+      if (error) throw error
+      await loadPosition()
+    } catch (error) {
+      console.error('Error deleting chart:', error)
     }
   }
 
@@ -541,38 +590,158 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* Chart */}
-      {position.chart_url && (
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <h3 className="font-semibold mb-3">TradingView Chart</h3>
-          {tradingViewImageUrl ? (
-            <a
-              href={position.chart_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block hover:opacity-90 transition-opacity"
-            >
-              <img
-                src={tradingViewImageUrl}
-                alt="TradingView Chart"
-                className="w-full rounded-lg border border-gray-700"
-              />
-              <div className="text-xs text-gray-400 mt-2 text-center">
-                Click to open in TradingView
+      {/* Charts */}
+      <div className="space-y-4">
+        {/* Entry Chart */}
+        {position.chart_url && (
+          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <h3 className="font-semibold mb-3">Entry Chart</h3>
+            {tradingViewImageUrl ? (
+              <a
+                href={position.chart_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block hover:opacity-90 transition-opacity"
+              >
+                <img
+                  src={tradingViewImageUrl}
+                  alt="Entry Chart"
+                  className="w-full rounded-lg border border-gray-700"
+                />
+                <div className="text-xs text-gray-400 mt-2 text-center">
+                  Click to open in TradingView
+                </div>
+              </a>
+            ) : (
+              <a
+                href={position.chart_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-400 underline break-all"
+              >
+                {position.chart_url}
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Additional Charts */}
+        {additionalCharts.map((chart) => {
+          const imgUrl = getTradingViewImageUrl(chart.chart_url)
+          return (
+            <div key={chart.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">{chart.label || 'Chart Update'}</h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500">
+                    {new Date(chart.created_at).toLocaleDateString()}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteChart(chart.id)}
+                    className="text-xs text-red-500 hover:text-red-400"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </a>
-          ) : (
-            <a
-              href={position.chart_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:text-blue-400 underline break-all"
-            >
-              {position.chart_url}
-            </a>
-          )}
-        </div>
-      )}
+              {imgUrl ? (
+                <a
+                  href={chart.chart_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block hover:opacity-90 transition-opacity"
+                >
+                  <img
+                    src={imgUrl}
+                    alt={chart.label || 'Chart Update'}
+                    className="w-full rounded-lg border border-gray-700"
+                  />
+                  <div className="text-xs text-gray-400 mt-2 text-center">
+                    Click to open in TradingView
+                  </div>
+                </a>
+              ) : (
+                <a
+                  href={chart.chart_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-400 underline break-all"
+                >
+                  {chart.chart_url}
+                </a>
+              )}
+              {chart.notes && (
+                <div className="mt-3 p-3 bg-gray-900 rounded-lg text-sm text-gray-300 whitespace-pre-wrap">
+                  {chart.notes}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Add Chart Button / Form */}
+        {!showAddChart ? (
+          <button
+            onClick={() => setShowAddChart(true)}
+            className="w-full py-3 border-2 border-dashed border-gray-700 rounded-lg text-gray-400 hover:text-gray-200 hover:border-gray-500 transition-colors"
+          >
+            + Add Chart
+          </button>
+        ) : (
+          <form onSubmit={handleAddChart} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Add Chart</h3>
+              <button
+                type="button"
+                onClick={() => { setShowAddChart(false); setChartForm({ chart_url: '', label: '', notes: '' }) }}
+                className="text-gray-400 hover:text-gray-200 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Label (optional)</label>
+                <input
+                  type="text"
+                  value={chartForm.label}
+                  onChange={(e) => setChartForm({ ...chartForm, label: e.target.value })}
+                  placeholder="e.g. Week 2 Update, Exit Chart, Breakout Day"
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">TradingView Chart URL</label>
+                <input
+                  type="text"
+                  value={chartForm.chart_url}
+                  onChange={(e) => setChartForm({ ...chartForm, chart_url: e.target.value })}
+                  placeholder="https://www.tradingview.com/x/..."
+                  required
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Notes (optional)</label>
+                <textarea
+                  value={chartForm.notes}
+                  onChange={(e) => setChartForm({ ...chartForm, notes: e.target.value })}
+                  rows={3}
+                  placeholder="What are you seeing? How is the trade progressing?"
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors"
+              >
+                {loading ? 'Adding...' : 'Add Chart'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
 
       {/* Notes */}
       {position.notes && (

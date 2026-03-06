@@ -116,8 +116,8 @@ export default function Performance() {
         exitPnL = exitPnL - exit.exit_fee - proportionalFee
 
         const riskPerShare = Math.abs(position.entry_price - position.stop_price)
-        const totalRisk = riskPerShare * exit.shares_sold
-        const rMultiple = totalRisk > 0 ? exitPnL / totalRisk : 0
+        const totalPositionRisk = riskPerShare * position.total_shares
+        const rMultiple = totalPositionRisk > 0 ? exitPnL / totalPositionRisk : 0
 
         events.push({
           date: exit.exit_date,
@@ -245,7 +245,12 @@ export default function Performance() {
   const currentPnL = chartData.length > 0 ? chartData[chartData.length - 1].cumulativePnL : 0
   const displayValue = mode === 'percent' && startingCapital === 0 ? currentPnL : currentValue
   const valueColor = displayValue >= 0 ? 'text-green-500' : 'text-red-500'
-  const lineColor = displayValue >= 0 ? '#10b981' : '#ef4444'
+
+  // Calculate gradient offset so the line is green above 0 and red below 0
+  const chartValues = chartData.map(d => d.value)
+  const maxVal = chartData.length > 0 ? Math.max(...chartValues, 0) : 0
+  const minVal = chartData.length > 0 ? Math.min(...chartValues, 0) : 0
+  const zeroOffset = maxVal === minVal ? 0.5 : maxVal / (maxVal - minVal)
 
   return (
     <div className="space-y-6">
@@ -355,6 +360,14 @@ export default function Performance() {
         ) : (
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={chartData}>
+              <defs>
+                <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset={`${zeroOffset * 100}%`} stopColor="#10b981" />
+                  <stop offset={`${zeroOffset * 100}%`} stopColor="#ef4444" />
+                  <stop offset="100%" stopColor="#ef4444" />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis
                 dataKey="date"
@@ -384,12 +397,25 @@ export default function Performance() {
                 }
                 labelFormatter={(label) => `Date: ${label}`}
               />
+              <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="3 3" />
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke={lineColor}
+                stroke="url(#lineGradient)"
                 strokeWidth={2}
-                dot={{ fill: lineColor, r: 4 }}
+                dot={(props: any) => {
+                  const { cx, cy, value } = props
+                  return (
+                    <circle
+                      key={`dot-${cx}-${cy}`}
+                      cx={cx}
+                      cy={cy}
+                      r={4}
+                      fill={value >= 0 ? '#10b981' : '#ef4444'}
+                      stroke="none"
+                    />
+                  )
+                }}
                 activeDot={{ r: 6 }}
               />
             </LineChart>

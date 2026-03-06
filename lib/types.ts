@@ -34,6 +34,15 @@ export interface PositionWithExits extends Position {
   exits: Exit[]
 }
 
+export interface PositionChart {
+  id: string
+  position_id: string
+  chart_url: string
+  label: string | null
+  notes: string | null
+  created_at: string
+}
+
 export interface Account {
   id: string
   year: number
