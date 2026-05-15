@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
@@ -15,6 +16,7 @@ interface SavedCalculation {
 }
 
 export default function Calculator() {
+  const router = useRouter()
   const [ticker, setTicker] = useState<string>('')
   const [entryPrice, setEntryPrice] = useState<number>(0)
   const [stopPrice, setStopPrice] = useState<number>(0)
@@ -115,6 +117,10 @@ export default function Calculator() {
     setStopPrice(calc.stop_price)
     setRiskPercent(calc.risk_percent)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleAddToJournal(calc: SavedCalculation) {
+    router.push(`/add-position?fromWatchlist=${calc.id}`)
   }
 
   async function handleDelete(id: string) {
@@ -343,6 +349,12 @@ export default function Calculator() {
                             className="text-xs text-blue-500 hover:text-blue-400"
                           >
                             Load
+                          </button>
+                          <button
+                            onClick={() => handleAddToJournal(calc)}
+                            className="text-xs text-green-500 hover:text-green-400"
+                          >
+                            Add
                           </button>
                           <button
                             onClick={() => handleDelete(calc.id)}

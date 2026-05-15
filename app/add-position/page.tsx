@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { getSetupTypes } from '@/lib/setupTypes'
 import { PositionInput, SetupType } from '@/lib/types'
@@ -17,6 +17,8 @@ interface SavedCalculation {
 
 export default function AddPosition() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromWatchlistId = searchParams.get('fromWatchlist')
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([])
   const [savedCalcs, setSavedCalcs] = useState<SavedCalculation[]>([])
   const [loading, setLoading] = useState(false)
@@ -55,7 +57,24 @@ export default function AddPosition() {
       .select('*')
       .order('ticker', { ascending: true })
 
-    if (data) setSavedCalcs(data)
+    if (data) {
+      setSavedCalcs(data)
+      if (fromWatchlistId) {
+        const match = data.find((c) => c.id === fromWatchlistId)
+        if (match) {
+          const today = new Date().toISOString().split('T')[0]
+          setFormData((prev) => ({
+            ...prev,
+            ticker: match.ticker,
+            entry_price: match.entry_price,
+            stop_price: match.stop_price,
+            total_shares: match.shares_to_buy,
+            entry_date: today,
+          }))
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+      }
+    }
   }
 
   function applyWatchlistItem(calc: SavedCalculation) {
