@@ -1,47 +1,12 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/StatCard'
 import SetupBadge from '@/components/SetupBadge'
 import { formatCurrency, formatPercent, getColorClass, calculatePositionMetrics } from '@/lib/calculations'
-import { Position, Exit, SetupType, Account, PositionWithExits } from '@/lib/types'
-
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-async function getDashboardData() {
-  const currentYear = new Date().getFullYear()
-
-  // Get current year account
-  const { data: account } = await supabase
-    .from('accounts')
-    .select('*')
-    .eq('year', currentYear)
-    .single()
-
-  // Get all positions
-  const { data: positionsData } = await supabase
-    .from('positions')
-    .select('*')
-    .order('entry_date', { ascending: false })
-
-  // Get all exits
-  const { data: exitsData } = await supabase
-    .from('exits')
-    .select('*')
-
-  // Get setup types
-  const { data: setupTypes } = await supabase
-    .from('setup_types')
-    .select('*')
-
-  // Combine positions with their exits
-  const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position) => ({
-    ...position,
-    exits: (exitsData || []).filter((exit) => exit.position_id === position.id),
-  }))
-
-  return { account, positions: positionsWithExits, setupTypes: setupTypes || [] }
-}
+import { SetupType, Account, PositionWithExits } from '@/lib/types'
 
 function calculateYTDMetrics(positions: PositionWithExits[], startingCapital: number) {
   let totalNetPnL = 0
@@ -70,7 +35,6 @@ function calculateYTDMetrics(positions: PositionWithExits[], startingCapital: nu
   const avgR = positions.length > 0 ? totalR / positions.length : 0
   const ytdReturn = startingCapital > 0 ? (totalNetPnL / startingCapital) * 100 : 0
 
-  // Calculate win streak
   const closedPositions = positions
     .filter((p) => {
       const metrics = calculatePositionMetrics(p, p.exits)
@@ -173,21 +137,60 @@ function calculateSetupPerformance(positions: PositionWithExits[], setupTypes: S
     .sort((a, b) => b!.totalPnL - a!.totalPnL)
 }
 
-export default async function Dashboard() {
-  const { account, positions, setupTypes } = await getDashboardData()
+export default function Dashboard() {
+  const [account, setAccount] = useState<Account | null>(null)
+  const [positions, setPositions] = useState<PositionWithExits[]>([])
+  const [setupTypes, setSetupTypes] = useState<SetupType[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  async function loadDashboardData() {
+    const currentYear = new Date().getFullYear()
+
+    const { data: accountData } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('year', currentYear)
+      .single()
+
+    const { data: positionsData } = await supabase
+      .from('positions')
+      .select('*')
+      .order('entry_date', { ascending: false })
+
+    const { data: exitsData } = await supabase
+      .from('exits')
+      .select('*')
+
+    const { data: setupTypesData } = await supabase
+      .from('setup_types')
+      .select('*')
+
+    const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position) => ({
+      ...position,
+      exits: (exitsData || []).filter((exit) => exit.position_id === position.id),
+    }))
+
+    setAccount(accountData)
+    setPositions(positionsWithExits)
+    setSetupTypes(setupTypesData || [])
+    setLoading(false)
+  }
+
+  if (loading) {
+    return <div className="text-center py-12 text-gray-400">Loading...</div>
+  }
+
   const startingCapital = account?.starting_capital || 0
   const metrics = calculateYTDMetrics(positions, startingCapital)
   const setupPerformance = calculateSetupPerformance(positions, setupTypes)
 
-  // Split positions into open and closed
   const openPositions = positions.filter((p) => {
     const m = calculatePositionMetrics(p, p.exits)
     return m.is_open
-  })
-
-  const closedPositions = positions.filter((p) => {
-    const m = calculatePositionMetrics(p, p.exits)
-    return !m.is_open
   })
 
   const getSetupColor = (setupName: string) => {
@@ -195,7 +198,6 @@ export default async function Dashboard() {
     return setup?.color || '#6b7280'
   }
 
-  // Calculate Portfolio Heat (total risk exposure for open positions)
   const portfolioHeat = openPositions.reduce((total, position) => {
     const m = calculatePositionMetrics(position, position.exits)
     const riskPerShare = Math.abs(position.entry_price - position.stop_price)
@@ -284,7 +286,7 @@ export default async function Dashboard() {
 
       {/* Open Positions */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-bold">Open Positions ({openPositions.length})</h2>
           <Link
             href="/add-position"
@@ -296,52 +298,102 @@ export default async function Dashboard() {
 
         {openPositions.length === 0 ? (
           <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-500">
-            No open positions. All positions have been closed.
+            No open positions.
           </div>
         ) : (
-          <div className="space-y-3">
-            {openPositions.map((position) => {
-              const metrics = calculatePositionMetrics(position, position.exits)
-              return (
-                <Link
-                  key={position.id}
-                  href={`/positions/${position.id}`}
-                  className="block bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-lg">{position.ticker}</span>
-                      <span className="text-xs px-2 py-1 rounded bg-gray-700 capitalize">
-                        {position.direction}
-                      </span>
-                      <SetupBadge name={position.setup_type} color={getSetupColor(position.setup_type)} />
-                    </div>
-                    <div className="text-right">
-                      <div className={`font-bold ${getColorClass(metrics.unrealized_pnl)}`}>
-                        {formatCurrency(metrics.unrealized_pnl)}
+          <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-900 text-gray-400 text-xs">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">Ticker</th>
+                    <th className="text-left px-3 py-2 font-medium">Setup</th>
+                    <th className="text-right px-3 py-2 font-medium">Shares</th>
+                    <th className="text-right px-3 py-2 font-medium">Entry</th>
+                    <th className="text-right px-3 py-2 font-medium">Stop</th>
+                    <th className="text-right px-3 py-2 font-medium">Current</th>
+                    <th className="text-right px-3 py-2 font-medium">P&L</th>
+                    <th className="text-right px-3 py-2 font-medium">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openPositions.map((position) => {
+                    const m = calculatePositionMetrics(position, position.exits)
+                    const pctChange = position.current_price && position.entry_price
+                      ? ((position.current_price - position.entry_price) / position.entry_price) * 100 * (position.direction === 'long' ? 1 : -1)
+                      : null
+                    return (
+                      <tr
+                        key={position.id}
+                        onClick={() => window.location.assign(`/positions/${position.id}`)}
+                        className="border-t border-gray-700/50 hover:bg-gray-700/30 cursor-pointer"
+                      >
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold">{position.ticker}</span>
+                            <span className="text-xs text-gray-500 uppercase">{position.direction === 'long' ? 'L' : 'S'}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <SetupBadge name={position.setup_type} color={getSetupColor(position.setup_type)} />
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-300">
+                          {m.shares_remaining}
+                          {m.shares_sold > 0 && <span className="text-gray-500"> / {position.total_shares}</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-300">${position.entry_price.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-gray-300">${position.stop_price.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-gray-300">
+                          {position.current_price ? `$${position.current_price.toFixed(2)}` : '—'}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-semibold ${getColorClass(m.unrealized_pnl)}`}>
+                          {formatCurrency(m.unrealized_pnl)}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-semibold ${getColorClass(pctChange || 0)}`}>
+                          {pctChange !== null ? `${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(2)}%` : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile compact list */}
+            <div className="md:hidden divide-y divide-gray-700/50">
+              {openPositions.map((position) => {
+                const m = calculatePositionMetrics(position, position.exits)
+                const pctChange = position.current_price && position.entry_price
+                  ? ((position.current_price - position.entry_price) / position.entry_price) * 100 * (position.direction === 'long' ? 1 : -1)
+                  : null
+                return (
+                  <Link
+                    key={position.id}
+                    href={`/positions/${position.id}`}
+                    className="flex items-center justify-between p-3 hover:bg-gray-700/30"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">{position.ticker}</span>
+                        <span className="text-xs text-gray-500 uppercase">{position.direction === 'long' ? 'L' : 'S'}</span>
                       </div>
-                      <div className="text-xs text-gray-400">unrealized</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {m.shares_remaining}sh · ${position.entry_price.toFixed(2)} → ${position.current_price?.toFixed(2) || '—'}
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 text-sm text-gray-400">
-                    <div>Entry: ${position.entry_price.toFixed(2)}</div>
-                    <div>
-                      Shares: {metrics.shares_remaining}
-                      {metrics.shares_sold > 0 && ` / ${position.total_shares}`}
+                    <div className="text-right ml-3">
+                      <div className={`font-semibold ${getColorClass(m.unrealized_pnl)}`}>
+                        {formatCurrency(m.unrealized_pnl)}
+                      </div>
+                      <div className={`text-xs ${getColorClass(pctChange || 0)}`}>
+                        {pctChange !== null ? `${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(2)}%` : '—'}
+                      </div>
                     </div>
-                    <div>Current: ${position.current_price?.toFixed(2) || '-'}</div>
-                  </div>
-                  {metrics.realized_pnl !== 0 && (
-                    <div className="mt-2 text-sm">
-                      <span className="text-gray-400">Realized: </span>
-                      <span className={getColorClass(metrics.realized_pnl)}>
-                        {formatCurrency(metrics.realized_pnl)}
-                      </span>
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
