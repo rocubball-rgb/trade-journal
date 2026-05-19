@@ -16,6 +16,7 @@ export default function PositionDetail() {
   const [exits, setExits] = useState<Exit[]>([])
   const [setupColor, setSetupColor] = useState('#6b7280')
   const [showAddExit, setShowAddExit] = useState(false)
+  const [editingExitId, setEditingExitId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [additionalCharts, setAdditionalCharts] = useState<PositionChart[]>([])
   const [showAddChart, setShowAddChart] = useState(false)
@@ -77,25 +78,42 @@ export default function PositionDetail() {
 
     const metrics = calculatePositionMetrics(position, exits)
 
-    if (exitForm.shares_sold > metrics.shares_remaining) {
-      alert(`Cannot sell ${exitForm.shares_sold} shares. Only ${metrics.shares_remaining} remaining.`)
+    // When editing, the current exit's shares are already counted in shares_remaining
+    // We need to add them back when checking the new amount
+    const currentExitShares = editingExitId
+      ? exits.find((ex) => ex.id === editingExitId)?.shares_sold || 0
+      : 0
+    const effectiveRemaining = metrics.shares_remaining + currentExitShares
+
+    if (exitForm.shares_sold > effectiveRemaining) {
+      alert(`Cannot sell ${exitForm.shares_sold} shares. Only ${effectiveRemaining} available.`)
       return
     }
 
     setLoading(true)
 
     try {
-      const { error } = await supabase.from('exits').insert([
-        {
-          position_id: positionId,
-          ...exitForm,
-        },
-      ])
+      if (editingExitId) {
+        const { error } = await supabase
+          .from('exits')
+          .update(exitForm)
+          .eq('id', editingExitId)
 
-      if (error) throw error
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('exits').insert([
+          {
+            position_id: positionId,
+            ...exitForm,
+          },
+        ])
+
+        if (error) throw error
+      }
 
       await loadPosition()
       setShowAddExit(false)
+      setEditingExitId(null)
       setExitForm({
         exit_date: '',
         exit_price: 0,
@@ -104,10 +122,36 @@ export default function PositionDetail() {
         notes: '',
       })
     } catch (error) {
-      console.error('Error adding exit:', error)
-      alert('Failed to add exit. Please try again.')
+      console.error('Error saving exit:', error)
+      alert('Failed to save exit. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleEditExit = (exit: Exit) => {
+    setExitForm({
+      exit_date: exit.exit_date,
+      exit_price: exit.exit_price,
+      shares_sold: exit.shares_sold,
+      exit_fee: exit.exit_fee,
+      notes: exit.notes || '',
+    })
+    setEditingExitId(exit.id)
+    setShowAddExit(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteExit = async (id: string) => {
+    if (!confirm('Delete this exit? This cannot be undone.')) return
+
+    try {
+      const { error } = await supabase.from('exits').delete().eq('id', id)
+      if (error) throw error
+      await loadPosition()
+    } catch (error) {
+      console.error('Error deleting exit:', error)
+      alert('Failed to delete exit.')
     }
   }
 
@@ -450,6 +494,7 @@ export default function PositionDetail() {
                 onClick={() => {
                   if (showAddExit) {
                     setShowAddExit(false)
+                    setEditingExitId(null)
                     setExitForm({ exit_date: '', exit_price: 0, shares_sold: 0, exit_fee: 0, notes: '' })
                   } else {
                     setShowAddExit(true)
@@ -479,12 +524,29 @@ export default function PositionDetail() {
               )}
             </div>
           )}
+          {!metrics.is_open && showAddExit && (
+            <button
+              onClick={() => {
+                setShowAddExit(false)
+                setEditingExitId(null)
+                setExitForm({ exit_date: '', exit_price: 0, shares_sold: 0, exit_fee: 0, notes: '' })
+              }}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
+            >
+              Cancel
+            </button>
+          )}
         </div>
 
-        {showAddExit && (
+        {showAddExit && (() => {
+          const currentExitShares = editingExitId
+            ? exits.find((ex) => ex.id === editingExitId)?.shares_sold || 0
+            : 0
+          const maxShares = metrics.shares_remaining + currentExitShares
+          return (
           <form onSubmit={handleAddExit} className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-4">
             <h3 className="font-semibold mb-4">
-              Selling shares (Max: {metrics.shares_remaining})
+              {editingExitId ? `Editing exit (Max: ${maxShares})` : `Selling shares (Max: ${maxShares})`}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -515,12 +577,12 @@ export default function PositionDetail() {
                   value={exitForm.shares_sold || ''}
                   onChange={(e) => setExitForm({ ...exitForm, shares_sold: parseInt(e.target.value) || 0 })}
                   required
-                  max={metrics.shares_remaining}
+                  max={maxShares}
                   className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {exitForm.shares_sold > 0 && (
                   <div className="text-xs text-gray-400 mt-1">
-                    {metrics.shares_remaining - exitForm.shares_sold} will remain
+                    {maxShares - exitForm.shares_sold} will remain
                   </div>
                 )}
               </div>
@@ -549,10 +611,11 @@ export default function PositionDetail() {
               disabled={loading}
               className="mt-4 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition-colors"
             >
-              {loading ? 'Adding...' : 'Add Exit'}
+              {loading ? 'Saving...' : editingExitId ? 'Update Exit' : 'Add Exit'}
             </button>
           </form>
-        )}
+          )
+        })()}
 
         {exits.length === 0 ? (
           <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-500">
@@ -573,8 +636,22 @@ export default function PositionDetail() {
                       <div className="text-sm text-gray-400">{exit.exit_date}</div>
                       <div className="font-semibold">{exit.shares_sold} shares @ ${exit.exit_price.toFixed(2)}</div>
                     </div>
-                    <div className={`font-bold ${getColorClass(exitPnL)}`}>
-                      {formatCurrency(exitPnL)}
+                    <div className="flex items-center gap-3">
+                      <div className={`font-bold ${getColorClass(exitPnL)}`}>
+                        {formatCurrency(exitPnL)}
+                      </div>
+                      <button
+                        onClick={() => handleEditExit(exit)}
+                        className="text-xs text-blue-500 hover:text-blue-400"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteExit(exit.id)}
+                        className="text-xs text-red-500 hover:text-red-400"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                   {exit.notes && (
