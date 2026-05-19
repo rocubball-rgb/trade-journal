@@ -12,6 +12,8 @@ export interface Position {
   stop_price: number
   setup_type: string
   ncfd_reading: number
+  last_cycle: number | null
+  bars_since_low: number | null
   market_cycle: MarketCycle
   notes: string | null
   chart_url: string | null
@@ -67,6 +69,8 @@ export interface PositionInput {
   stop_price: number
   setup_type: string
   ncfd_reading: number
+  last_cycle?: number | null
+  bars_since_low?: number | null
   market_cycle: MarketCycle
   notes?: string | null
   chart_url?: string | null

@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS positions (
   stop_price DECIMAL(12, 4) NOT NULL,
   setup_type TEXT NOT NULL,
   ncfd_reading INTEGER NOT NULL CHECK (ncfd_reading >= 0 AND ncfd_reading <= 100),
+  last_cycle INTEGER,
+  bars_since_low INTEGER,
   market_cycle TEXT NOT NULL CHECK (market_cycle IN ('green', 'red')),
   notes TEXT,
   chart_url TEXT,

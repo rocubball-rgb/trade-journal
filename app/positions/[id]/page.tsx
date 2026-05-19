@@ -837,6 +837,18 @@ export default function PositionDetail() {
             <span className="text-gray-200">{position.ncfd_reading}</span>
           </div>
           <div>
+            <span className="text-gray-400">Last Cycle:</span>{' '}
+            <span className="text-gray-200">
+              {position.last_cycle !== null && position.last_cycle !== undefined ? `${position.last_cycle} bars` : '—'}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400">Bars Since Low:</span>{' '}
+            <span className="text-gray-200">
+              {position.bars_since_low !== null && position.bars_since_low !== undefined ? `T-${position.bars_since_low}` : '—'}
+            </span>
+          </div>
+          <div>
             <span className="text-gray-400">Market Cycle:</span>{' '}
             <span className="text-gray-200 capitalize">
               {position.market_cycle === 'green' ? '🟢 Green' : '🔴 Red'}

@@ -51,6 +51,8 @@ export default function EditPosition() {
           stop_price: formData.stop_price,
           setup_type: formData.setup_type,
           ncfd_reading: formData.ncfd_reading,
+          last_cycle: formData.last_cycle,
+          bars_since_low: formData.bars_since_low,
           market_cycle: formData.market_cycle,
           notes: formData.notes,
           chart_url: formData.chart_url,
@@ -236,6 +238,39 @@ export default function EditPosition() {
             <span>0</span>
             <span>50</span>
             <span>100</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Last Cycle (bars)</label>
+            <input
+              type="number"
+              value={formData.last_cycle ?? ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                last_cycle: e.target.value === '' ? null : parseInt(e.target.value),
+              })}
+              placeholder="e.g. 34"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="text-xs text-gray-500 mt-1">Bars in the previous NCFD cycle</div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Bars Since Low {formData.bars_since_low !== null && formData.bars_since_low !== undefined ? `(T-${formData.bars_since_low})` : ''}
+            </label>
+            <input
+              type="number"
+              value={formData.bars_since_low ?? ''}
+              onChange={(e) => setFormData({
+                ...formData,
+                bars_since_low: e.target.value === '' ? null : parseInt(e.target.value),
+              })}
+              placeholder="e.g. 0, 1, 2..."
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="text-xs text-gray-500 mt-1">Bars since the current NCFD low</div>
           </div>
         </div>
 
