@@ -142,6 +142,36 @@ export default function Dashboard() {
   const [positions, setPositions] = useState<PositionWithExits[]>([])
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingPrices, setEditingPrices] = useState<Record<string, string>>({})
+
+  async function commitCurrentPrice(positionId: string) {
+    const raw = editingPrices[positionId]
+    if (raw === undefined) return
+
+    setEditingPrices((prev) => {
+      const next = { ...prev }
+      delete next[positionId]
+      return next
+    })
+
+    const newPrice = parseFloat(raw)
+    if (isNaN(newPrice)) return
+
+    // Optimistic local update
+    setPositions((prev) =>
+      prev.map((p) => (p.id === positionId ? { ...p, current_price: newPrice } : p))
+    )
+
+    const { error } = await supabase
+      .from('positions')
+      .update({ current_price: newPrice })
+      .eq('id', positionId)
+
+    if (error) {
+      console.error('Error updating current price:', error)
+      alert('Failed to update price.')
+    }
+  }
 
   useEffect(() => {
     loadDashboardData()
@@ -344,8 +374,25 @@ export default function Dashboard() {
                         </td>
                         <td className="px-3 py-2 text-right text-gray-300">${position.entry_price.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right text-gray-300">${position.stop_price.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right text-gray-300">
-                          {position.current_price ? `$${position.current_price.toFixed(2)}` : '—'}
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={editingPrices[position.id] !== undefined
+                              ? editingPrices[position.id]
+                              : (position.current_price ?? '')}
+                            onChange={(e) =>
+                              setEditingPrices((prev) => ({ ...prev, [position.id]: e.target.value }))
+                            }
+                            onBlur={() => commitCurrentPrice(position.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="—"
+                            className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-right text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
                         </td>
                         <td className={`px-3 py-2 text-right font-semibold ${getColorClass(m.unrealized_pnl)}`}>
                           {formatCurrency(m.unrealized_pnl)}
@@ -368,29 +415,47 @@ export default function Dashboard() {
                   ? ((position.current_price - position.entry_price) / position.entry_price) * 100 * (position.direction === 'long' ? 1 : -1)
                   : null
                 return (
-                  <Link
+                  <div
                     key={position.id}
-                    href={`/positions/${position.id}`}
-                    className="flex items-center justify-between p-3 hover:bg-gray-700/30"
+                    className="flex items-center justify-between p-3 hover:bg-gray-700/30 gap-2"
                   >
-                    <div className="min-w-0">
+                    <Link href={`/positions/${position.id}`} className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold">{position.ticker}</span>
                         <span className="text-xs text-gray-500 uppercase">{position.direction === 'long' ? 'L' : 'S'}</span>
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">
-                        {m.shares_remaining}sh · ${position.entry_price.toFixed(2)} → ${position.current_price?.toFixed(2) || '—'}
+                        {m.shares_remaining}sh · entry ${position.entry_price.toFixed(2)}
+                      </div>
+                    </Link>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={editingPrices[position.id] !== undefined
+                          ? editingPrices[position.id]
+                          : (position.current_price ?? '')}
+                        onChange={(e) =>
+                          setEditingPrices((prev) => ({ ...prev, [position.id]: e.target.value }))
+                        }
+                        onBlur={() => commitCurrentPrice(position.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                        }}
+                        placeholder="price"
+                        className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-right text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="text-right min-w-[70px]">
+                        <div className={`font-semibold text-sm ${getColorClass(m.unrealized_pnl)}`}>
+                          {formatCurrency(m.unrealized_pnl)}
+                        </div>
+                        <div className={`text-xs ${getColorClass(pctChange || 0)}`}>
+                          {pctChange !== null ? `${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(2)}%` : '—'}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right ml-3">
-                      <div className={`font-semibold ${getColorClass(m.unrealized_pnl)}`}>
-                        {formatCurrency(m.unrealized_pnl)}
-                      </div>
-                      <div className={`text-xs ${getColorClass(pctChange || 0)}`}>
-                        {pctChange !== null ? `${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(2)}%` : '—'}
-                      </div>
-                    </div>
-                  </Link>
+                  </div>
                 )
               })}
             </div>
