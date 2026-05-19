@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { getSetupTypes } from '@/lib/setupTypes'
@@ -16,6 +16,14 @@ interface SavedCalculation {
 }
 
 export default function AddPosition() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-400">Loading...</div>}>
+      <AddPositionInner />
+    </Suspense>
+  )
+}
+
+function AddPositionInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fromWatchlistId = searchParams.get('fromWatchlist')
