@@ -20,6 +20,7 @@ export default function Calculator() {
   const [ticker, setTicker] = useState<string>('')
   const [entryPrice, setEntryPrice] = useState<number>(0)
   const [stopPrice, setStopPrice] = useState<number>(0)
+  const [stopPercent, setStopPercent] = useState<number>(0)
   const [riskPercent, setRiskPercent] = useState<number>(0.3)
   const [totalCapital, setTotalCapital] = useState<number>(0)
   const [capitalLoaded, setCapitalLoaded] = useState<boolean>(false)
@@ -61,7 +62,30 @@ export default function Calculator() {
   const sharesToBuy = riskPerShare > 0 ? Math.floor(riskAmount / riskPerShare) : 0
   const totalPositionSize = sharesToBuy * entryPrice
   const positionPercent = totalCapital > 0 ? (totalPositionSize / totalCapital) * 100 : 0
-  const stopPercent = entryPrice > 0 ? (riskPerShare / entryPrice) * 100 : 0
+
+  // When entry price changes, keep stop % static and recompute stop price
+  function handleEntryPriceChange(newEntry: number) {
+    setEntryPrice(newEntry)
+    if (newEntry > 0 && stopPercent > 0) {
+      setStopPrice(parseFloat((newEntry * (1 - stopPercent / 100)).toFixed(4)))
+    }
+  }
+
+  // When stop price changes, recompute stop %
+  function handleStopPriceChange(newStop: number) {
+    setStopPrice(newStop)
+    if (entryPrice > 0 && newStop > 0) {
+      setStopPercent(parseFloat((Math.abs(entryPrice - newStop) / entryPrice * 100).toFixed(2)))
+    }
+  }
+
+  // When stop % changes, recompute stop price
+  function handleStopPercentChange(newPct: number) {
+    setStopPercent(newPct)
+    if (entryPrice > 0) {
+      setStopPrice(parseFloat((entryPrice * (1 - newPct / 100)).toFixed(4)))
+    }
+  }
 
   const canSave = ticker.trim() !== '' && entryPrice > 0 && stopPrice > 0
 
@@ -115,6 +139,10 @@ export default function Calculator() {
     setTicker(calc.ticker)
     setEntryPrice(calc.entry_price)
     setStopPrice(calc.stop_price)
+    const pct = calc.entry_price > 0
+      ? parseFloat((Math.abs(calc.entry_price - calc.stop_price) / calc.entry_price * 100).toFixed(2))
+      : 0
+    setStopPercent(pct)
     setRiskPercent(calc.risk_percent)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -194,7 +222,7 @@ export default function Calculator() {
               type="number"
               step="0.01"
               value={entryPrice || ''}
-              onChange={(e) => setEntryPrice(parseFloat(e.target.value) || 0)}
+              onChange={(e) => handleEntryPriceChange(parseFloat(e.target.value) || 0)}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
@@ -207,7 +235,7 @@ export default function Calculator() {
                 type="number"
                 step="0.01"
                 value={stopPrice || ''}
-                onChange={(e) => setStopPrice(parseFloat(e.target.value) || 0)}
+                onChange={(e) => handleStopPriceChange(parseFloat(e.target.value) || 0)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
@@ -217,13 +245,8 @@ export default function Calculator() {
               <input
                 type="number"
                 step="0.01"
-                value={entryPrice > 0 && stopPrice > 0 ? parseFloat((Math.abs(entryPrice - stopPrice) / entryPrice * 100).toFixed(2)) : ''}
-                onChange={(e) => {
-                  const pct = parseFloat(e.target.value) || 0
-                  if (entryPrice > 0) {
-                    setStopPrice(parseFloat((entryPrice * (1 - pct / 100)).toFixed(4)))
-                  }
-                }}
+                value={stopPercent || ''}
+                onChange={(e) => handleStopPercentChange(parseFloat(e.target.value) || 0)}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
