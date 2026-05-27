@@ -143,6 +143,7 @@ export default function Dashboard() {
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([])
   const [loading, setLoading] = useState(true)
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({})
+  const [sortBy, setSortBy] = useState<'default' | 'pnl-desc' | 'pnl-asc' | 'pct-desc' | 'pct-asc' | 'ticker'>('default')
 
   async function commitCurrentPrice(positionId: string) {
     const raw = editingPrices[positionId]
@@ -221,6 +222,26 @@ export default function Dashboard() {
   const openPositions = positions.filter((p) => {
     const m = calculatePositionMetrics(p, p.exits)
     return m.is_open
+  })
+
+  const sortedOpenPositions = [...openPositions].sort((a, b) => {
+    const ma = calculatePositionMetrics(a, a.exits)
+    const mb = calculatePositionMetrics(b, b.exits)
+    const pctA = a.current_price && a.entry_price
+      ? ((a.current_price - a.entry_price) / a.entry_price) * 100 * (a.direction === 'long' ? 1 : -1)
+      : 0
+    const pctB = b.current_price && b.entry_price
+      ? ((b.current_price - b.entry_price) / b.entry_price) * 100 * (b.direction === 'long' ? 1 : -1)
+      : 0
+
+    switch (sortBy) {
+      case 'pnl-desc': return mb.unrealized_pnl - ma.unrealized_pnl
+      case 'pnl-asc': return ma.unrealized_pnl - mb.unrealized_pnl
+      case 'pct-desc': return pctB - pctA
+      case 'pct-asc': return pctA - pctB
+      case 'ticker': return a.ticker.localeCompare(b.ticker)
+      default: return 0
+    }
   })
 
   const getSetupColor = (setupName: string) => {
@@ -316,14 +337,30 @@ export default function Dashboard() {
 
       {/* Open Positions */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <h2 className="text-xl font-bold">Open Positions ({openPositions.length})</h2>
-          <Link
-            href="/add-position"
-            className="text-blue-500 hover:text-blue-400 text-sm"
-          >
-            + Add Position
-          </Link>
+          <div className="flex items-center gap-3">
+            {openPositions.length > 1 && (
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="default">Most Recent</option>
+                <option value="pnl-desc">P&L: High → Low</option>
+                <option value="pnl-asc">P&L: Low → High</option>
+                <option value="pct-desc">% Change: High → Low</option>
+                <option value="pct-asc">% Change: Low → High</option>
+                <option value="ticker">Ticker A → Z</option>
+              </select>
+            )}
+            <Link
+              href="/add-position"
+              className="text-blue-500 hover:text-blue-400 text-sm"
+            >
+              + Add Position
+            </Link>
+          </div>
         </div>
 
         {openPositions.length === 0 ? (
@@ -348,7 +385,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {openPositions.map((position) => {
+                  {sortedOpenPositions.map((position) => {
                     const m = calculatePositionMetrics(position, position.exits)
                     const pctChange = position.current_price && position.entry_price
                       ? ((position.current_price - position.entry_price) / position.entry_price) * 100 * (position.direction === 'long' ? 1 : -1)
@@ -409,7 +446,7 @@ export default function Dashboard() {
 
             {/* Mobile compact list */}
             <div className="md:hidden divide-y divide-gray-700/50">
-              {openPositions.map((position) => {
+              {sortedOpenPositions.map((position) => {
                 const m = calculatePositionMetrics(position, position.exits)
                 const pctChange = position.current_price && position.entry_price
                   ? ((position.current_price - position.entry_price) / position.entry_price) * 100 * (position.direction === 'long' ? 1 : -1)
