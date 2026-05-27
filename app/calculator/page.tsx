@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { calculatePositionMetrics } from '@/lib/calculations'
+import { PositionWithExits } from '@/lib/types'
 
 interface SavedCalculation {
   id: string
@@ -35,14 +37,37 @@ export default function Calculator() {
 
   async function loadCapital() {
     const currentYear = new Date().getFullYear()
+
     const { data: account } = await supabase
       .from('accounts')
       .select('starting_capital')
       .eq('year', currentYear)
       .single()
 
-    if (account && account.starting_capital > 0) {
-      setTotalCapital(account.starting_capital)
+    const { data: positionsData } = await supabase
+      .from('positions')
+      .select('*')
+
+    const { data: exitsData } = await supabase
+      .from('exits')
+      .select('*')
+
+    const startingCapital = account?.starting_capital || 0
+
+    const positionsWithExits: PositionWithExits[] = (positionsData || []).map((position) => ({
+      ...position,
+      exits: (exitsData || []).filter((exit) => exit.position_id === position.id),
+    }))
+
+    const totalNetPnL = positionsWithExits.reduce((sum, position) => {
+      const m = calculatePositionMetrics(position, position.exits)
+      return sum + m.total_pnl
+    }, 0)
+
+    const currentEquity = startingCapital + totalNetPnL
+
+    if (currentEquity > 0) {
+      setTotalCapital(currentEquity)
     }
     setCapitalLoaded(true)
   }
@@ -286,7 +311,7 @@ export default function Calculator() {
 
         <div className="space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-gray-700">
-            <span className="text-gray-400">Total Capital</span>
+            <span className="text-gray-400">Current Equity</span>
             <span className="text-xl font-semibold">${totalCapital.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
 
