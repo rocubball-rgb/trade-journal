@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS positions (
   notes TEXT,
   chart_url TEXT,
   current_price DECIMAL(12, 4),
+  ib_order_id TEXT UNIQUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS exits (
   shares_sold INTEGER NOT NULL CHECK (shares_sold > 0),
   exit_fee DECIMAL(12, 2) NOT NULL DEFAULT 0,
   notes TEXT,
+  ib_order_id TEXT UNIQUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -56,6 +58,8 @@ CREATE INDEX IF NOT EXISTS idx_positions_market_cycle ON positions(market_cycle)
 CREATE INDEX IF NOT EXISTS idx_positions_ticker ON positions(ticker);
 CREATE INDEX IF NOT EXISTS idx_exits_position_id ON exits(position_id);
 CREATE INDEX IF NOT EXISTS idx_exits_exit_date ON exits(exit_date DESC);
+CREATE INDEX IF NOT EXISTS idx_positions_ib_order_id ON positions(ib_order_id);
+CREATE INDEX IF NOT EXISTS idx_exits_ib_order_id ON exits(ib_order_id);
 
 -- Insert default setup types
 INSERT INTO setup_types (name, color) VALUES

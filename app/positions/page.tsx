@@ -95,12 +95,20 @@ export default function PositionsList() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h2 className="text-2xl font-bold">Positions</h2>
 
-        <button
-          onClick={() => router.push('/add-position')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
-        >
-          + Add Position
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => router.push('/import')}
+            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
+          >
+            Import CSV
+          </button>
+          <button
+            onClick={() => router.push('/add-position')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+          >
+            + Add Position
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -18,6 +18,7 @@ export interface Position {
   notes: string | null
   chart_url: string | null
   current_price: number | null
+  ib_order_id: string | null
   created_at: string
 }
 
@@ -29,6 +30,7 @@ export interface Exit {
   shares_sold: number
   exit_fee: number
   notes: string | null
+  ib_order_id: string | null
   created_at: string
 }
 
