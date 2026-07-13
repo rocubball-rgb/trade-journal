@@ -88,11 +88,11 @@ export default function Calculator() {
   const totalPositionSize = sharesToBuy * entryPrice
   const positionPercent = totalCapital > 0 ? (totalPositionSize / totalCapital) * 100 : 0
 
-  // When entry price changes, keep stop % static and recompute stop price
+  // When entry price changes, keep stop price fixed and recompute stop %
   function handleEntryPriceChange(newEntry: number) {
     setEntryPrice(newEntry)
-    if (newEntry > 0 && stopPercent > 0) {
-      setStopPrice(parseFloat((newEntry * (1 - stopPercent / 100)).toFixed(4)))
+    if (newEntry > 0 && stopPrice > 0) {
+      setStopPercent(parseFloat((Math.abs(newEntry - stopPrice) / newEntry * 100).toFixed(2)))
     }
   }
 
