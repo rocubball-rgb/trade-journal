@@ -23,7 +23,7 @@ export default function Calculator() {
   const [entryPrice, setEntryPrice] = useState<number>(0)
   const [stopPrice, setStopPrice] = useState<number>(0)
   const [stopPercent, setStopPercent] = useState<number>(0)
-  const [riskPercent, setRiskPercent] = useState<number>(0.5)
+  const [riskPercent, setRiskPercent] = useState<number>(0.4)
   const [totalCapital, setTotalCapital] = useState<number>(0)
   const [capitalLoaded, setCapitalLoaded] = useState<boolean>(false)
   const [manualCapital, setManualCapital] = useState<boolean>(false)
@@ -287,6 +287,7 @@ export default function Calculator() {
             >
               <option value="0.25">0.25%</option>
               <option value="0.3">0.3%</option>
+              <option value="0.4">0.4%</option>
               <option value="0.5">0.5%</option>
               <option value="0.75">0.75%</option>
               <option value="1">1%</option>
